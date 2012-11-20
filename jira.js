@@ -1,9 +1,8 @@
-var http = require('http'),
-    url = require('url'),
-    request = require('request');
+var request = require('request');
+var url = require('url');
 
 
-var JiraApi = exports.JiraApi = function(protocol, host, port, username, password, apiVersion) {
+var JiraApi = exports.JiraApi = function(protocol, host, port, username, password, apiVersion, callback) {
     this.protocol = protocol;
     this.host = host;
     this.port = port;
@@ -12,6 +11,11 @@ var JiraApi = exports.JiraApi = function(protocol, host, port, username, passwor
     this.apiVersion = apiVersion;
 
     this.cookies = [];
+
+    this.login(function loggedIn(error) {
+        if (error) console.error(error);
+        callback(this);
+    });
 };
 
 (function() {
@@ -20,7 +24,7 @@ var JiraApi = exports.JiraApi = function(protocol, host, port, username, passwor
 
         var options = {
             uri: url.format({
-                protocol:  this.protocol,
+                protocol: this.protocol,
                 host: this.host,
                 port: this.port,
                 pathname: 'rest/auth/1/session'
@@ -57,100 +61,94 @@ var JiraApi = exports.JiraApi = function(protocol, host, port, username, passwor
 
     this.findIssue = function(issueNumber, callback) {
         var self = this;
-        this.login(function() {
-            var options = {
-                uri: url.format({
-                    protocol: self.protocol,
-                    host: self.host,
-                    port: self.port,
-                    pathname: 'rest/api/' + self.apiVersion + '/issue/' + issueNumber
-                }),
-                method: 'GET',
-                headers: {
-                    Cookie: self.cookies.join(';')
-                }
-            };
+        var options = {
+            uri: url.format({
+                protocol: self.protocol,
+                host: self.host,
+                port: self.port,
+                pathname: 'rest/api/' + self.apiVersion + '/issue/' + issueNumber
+            }),
+            method: 'GET',
+            headers: {
+                Cookie: self.cookies.join(';')
+            }
+        };
 
-            request(options, function(error, response, body) {
-                if (response.statusCode === 404) {
-                    callback('Invalid issue number.');
-                    return;
-                }
+        request(options, function(error, response, body) {
+            if (response.statusCode === 404) {
+                callback('Invalid issue number.');
+                return;
+            }
 
-                if (response.statusCode !== 200) {
-                    callback(response.statusCode + ': Unable to connect to JIRA during findIssueStatus.');
-                    return;
-                }
+            if (response.statusCode !== 200) {
+                callback(response.statusCode + ': Unable to connect to JIRA during findIssueStatus.');
+                return;
+            }
 
-                callback(null, JSON.parse(body));
+            callback(null, JSON.parse(body));
 
-            });
         });
     };
 
     this.getUnresolvedIssueCount = function(version, callback) {
         var self = this;
-        this.login(function() {
-            var options = {
-                uri: url.format({
-                    protocol: self.protocol,
-                    host: self.host,
-                    port: self.port,
-                    pathname: 'rest/api/' + self.apiVersion + '/version/' + version + '/unresolvedIssueCount'
-                }),
-                method: 'GET',
-                headers: {
-                    Cookie: self.cookies.join(';')
-                }
-            };
+        var options = {
+            uri: url.format({
+                protocol: self.protocol,
+                host: self.host,
+                port: self.port,
+                pathname: 'rest/api/' + self.apiVersion + '/version/' + version + '/unresolvedIssueCount'
+            }),
+            method: 'GET',
+            headers: {
+                Cookie: self.cookies.join(';')
+            }
+        };
 
-            request(options, function(error, response, body) {
-                if (response.statusCode === 404) {
-                    callback('Invalid version.');
-                    return;
-                }
+        request(options, function(error, response, body) {
+            if (response.statusCode === 404) {
+                callback('Invalid version.');
+                return;
+            }
 
-                if (response.statusCode !== 200) {
-                    callback(response.statusCode + ': Unable to connect to JIRA during findIssueStatus.');
-                    return;
-                }
+            if (response.statusCode !== 200) {
+                callback(response.statusCode + ': Unable to connect to JIRA during findIssueStatus.');
+                return;
+            }
 
-                body = JSON.parse(body);
-                callback(null, body.issuesUnresolvedCount);
-            });
+            body = JSON.parse(body);
+            callback(null, body.issuesUnresolvedCount);
         });
     };
 
     this.getProject = function(project, callback) {
         var self = this;
-        this.login(function() {
-            var options = {
-                uri: url.format({
-                    protocol: self.protocol,
-                    host: self.host,
-                    port: self.port,
-                    pathname: 'rest/api/' + self.apiVersion + '/project/' + project
-                }),
-                method: 'GET',
-                headers: {
-                    Cookie: self.cookies.join(';')
-                }
-            };
+        var options = {
+            uri: url.format({
+                protocol: self.protocol,
+                host: self.host,
+                port: self.port,
+                pathname: 'rest/api/' + self.apiVersion + '/project/' + project
+            }),
+            method: 'GET',
+            headers: {
+                Cookie: self.cookies.join(';')
+            }
+        };
 
-            request(options, function(error, response, body) {
-                if (response.statusCode === 404) {
-                    callback('Invalid project.');
-                    return;
-                }
+        request(options, function(error, response, body) {
+            if (response.statusCode === 404) {
+                callback('Invalid project.');
+                return;
+            }
 
-                if (response.statusCode !== 200) {
-                    callback(response.statusCode + ': Unable to connect to JIRA during getProject.');
-                    return;
-                }
+            if (response.statusCode !== 200) {
+                callback(response.statusCode + ': Unable to connect to JIRA during getProject.');
+                return;
+            }
 
-                body = JSON.parse(body);
-                callback(null, body);
-            });
+            body = JSON.parse(body);
+            callback(null, body);
         });
     };
 
@@ -161,44 +159,42 @@ var JiraApi = exports.JiraApi = function(protocol, host, port, username, passwor
      * @param callback
      */
     this.findRapidView = function(projectName, callback) {
-      var self = this;
-      this.login(function() {
+        var self = this;
         var options = {
-          uri: url.format({
-            protocol: self.protocol,
-            host: self.host,
-            port: self.port,
-            pathname: 'rest/greenhopper/' + self.apiVersion + '/rapidviews/list'
-          }),
-          method: 'GET',
-          headers: {
-            Cookie: self.cookies.join(';')
-          },
-          json: true,
+            uri: url.format({
+                protocol: self.protocol,
+                host: self.host,
+                port: self.port,
+                pathname: 'rest/greenhopper/' + self.apiVersion + '/rapidviews/list'
+            }),
+            method: 'GET',
+            headers: {
+                Cookie: self.cookies.join(';')
+            },
+            json: true,
         };
 
         request(options, function(error, response, body) {
-          if (response.statusCode === 404) {
-            callback('Invalid URL');
-            return;
-          }
-
-          if (response.statusCode !== 200) {
-            callback(response.statusCode + ': Unable to connect to JIRA during rapidView search.');
-            return;
-          }
-
-          if (response.body !== null) {
-            var rapidViews = response.body.views;
-            for (var i = 0; i < rapidViews.length; i++) {
-              if(rapidViews[i].name.toLowerCase() === projectName.toLowerCase()) {
-                callback(null, rapidViews[i]);
+            if (response.statusCode === 404) {
+                callback('Invalid URL');
                 return;
-              }
             }
-          }
+
+            if (response.statusCode !== 200) {
+                callback(response.statusCode + ': Unable to connect to JIRA during rapidView search.');
+                return;
+            }
+
+            if (response.body !== null) {
+                var rapidViews = response.body.views;
+                for (var i = 0; i < rapidViews.length; i++) {
+                    if (rapidViews[i].name.toLowerCase() === projectName.toLowerCase()) {
+                        callback(null, rapidViews[i]);
+                        return;
+                    }
+                }
+            }
         });
-      });
     };
 
     /**
@@ -208,40 +204,38 @@ var JiraApi = exports.JiraApi = function(protocol, host, port, username, passwor
      * @param callback
      */
     this.getLastSprintForRapidView = function(rapidViewId, callback) {
-      var self = this;
-      this.login(function() {
+        var self = this;
         var options = {
-          uri: url.format({
-            protocol: self.protocol,
-            host: self.host,
-            port: self.port,
-            pathname: 'rest/greenhopper/' + self.apiVersion + '/sprints/' + rapidViewId
-          }),
-          method: 'GET',
-          headers: {
-            Cookie: self.cookies.join(';')
-          },
-          json:true,
+            uri: url.format({
+                protocol: self.protocol,
+                host: self.host,
+                port: self.port,
+                pathname: 'rest/greenhopper/' + self.apiVersion + '/sprints/' + rapidViewId
+            }),
+            method: 'GET',
+            headers: {
+                Cookie: self.cookies.join(';')
+            },
+            json: true,
         };
 
         request(options, function(error, response, body) {
-          if (response.statusCode === 404) {
-            callback('Invalid URL');
-            return;
-          }
+            if (response.statusCode === 404) {
+                callback('Invalid URL');
+                return;
+            }
 
-          if (response.statusCode !== 200) {
-            callback(response.statusCode + ': Unable to connect to JIRA during sprints search.');
-            return;
-          }
+            if (response.statusCode !== 200) {
+                callback(response.statusCode + ': Unable to connect to JIRA during sprints search.');
+                return;
+            }
 
-          if (response.body !== null) {
-            var sprints = response.body.sprints;
-            callback(null, sprints.pop());
-            return;
-          }
+            if (response.body !== null) {
+                var sprints = response.body.sprints;
+                callback(null, sprints.pop());
+                return;
+            }
         });
-      });
     };
 
     /**
@@ -252,39 +246,37 @@ var JiraApi = exports.JiraApi = function(protocol, host, port, username, passwor
      * @param callback
      */
     this.addIssueToSprint = function(issueId, sprintId, callback) {
-      var self = this;
-      this.login(function() {
+        var self = this;
         var options = {
-          uri: url.format({
-            protocol: self.protocol,
-            host: self.host,
-            port: self.port,
-            pathname: 'rest/greenhopper/' + self.apiVersion + '/sprint/' + sprintId + '/issues/add'
-          }),
-          method: 'PUT',
-          headers: {
-            Cookie: self.cookies.join(';')
-          },
-          json:true,
-          body: {
-            issueKeys: [issueId]
-          }
+            uri: url.format({
+                protocol: self.protocol,
+                host: self.host,
+                port: self.port,
+                pathname: 'rest/greenhopper/' + self.apiVersion + '/sprint/' + sprintId + '/issues/add'
+            }),
+            method: 'PUT',
+            headers: {
+                Cookie: self.cookies.join(';')
+            },
+            json: true,
+            body: {
+                issueKeys: [issueId]
+            }
         };
 
         console.log(options.uri);
         request(options, function(error, response, body) {
-          if (response.statusCode === 404) {
-            callback('Invalid URL');
-            return;
-          }
+            if (response.statusCode === 404) {
+                callback('Invalid URL');
+                return;
+            }
 
-          if (response.statusCode !== 204) {
-            callback(response.statusCode + ': Unable to connect to JIRA to add to sprint.');
-            return;
-          }
+            if (response.statusCode !== 204) {
+                callback(response.statusCode + ': Unable to connect to JIRA to add to sprint.');
+                return;
+            }
 
         });
-      });
     };
 
     /**
@@ -309,107 +301,101 @@ var JiraApi = exports.JiraApi = function(protocol, host, port, username, passwor
      */
     this.issueLink = function(link, callback) {
         var self = this;
-        this.login(function() {
-            var options = {
-                uri: url.format({
-                    protocol: self.protocol,
-                    host: self.host,
-                    port: self.port,
-                    pathname: 'rest/api/' + self.apiVersion + '/issueLink'
-                }),
-                method: 'POST',
-                headers: {
-                    Cookie: self.cookies.join(';')
-                },
-                json: true,
-                body: link
-            };
+        var options = {
+            uri: url.format({
+                protocol: self.protocol,
+                host: self.host,
+                port: self.port,
+                pathname: 'rest/api/' + self.apiVersion + '/issueLink'
+            }),
+            method: 'POST',
+            headers: {
+                Cookie: self.cookies.join(';')
+            },
+            json: true,
+            body: link
+        };
 
-            request(options, function(error, response, body) {
-                if (response.statusCode === 404) {
-                    callback('Invalid project.');
-                    return;
-                }
+        request(options, function(error, response, body) {
+            if (response.statusCode === 404) {
+                callback('Invalid project.');
+                return;
+            }
 
-                if (response.statusCode !== 200) {
-                    callback(response.statusCode + ': Unable to connect to JIRA during issueLink.');
-                    return;
-                }
+            if (response.statusCode !== 200) {
+                callback(response.statusCode + ': Unable to connect to JIRA during issueLink.');
+                return;
+            }
 
-                callback(null);
-            });
+            callback(null);
         });
     };
 
     this.getVersions = function(project, callback) {
         var self = this;
-        this.login(function() {
-            var options = {
-                uri: url.format({
-                    protocol: self.protocol,
-                    host: self.host,
-                    port: self.port,
-                    pathname: 'rest/api/' + self.apiVersion + '/project/' + project + '/versions'
-                }),
-                method: 'GET',
-                headers: {
-                    Cookie: self.cookies.join(';')
-                }
-            };
+        var options = {
+            uri: url.format({
+                protocol: self.protocol,
+                host: self.host,
+                port: self.port,
+                pathname: 'rest/api/' + self.apiVersion + '/project/' + project + '/versions'
+            }),
+            method: 'GET',
+            headers: {
+                Cookie: self.cookies.join(';')
+            }
+        };
 
-            request(options, function(error, response, body) {
-                if (response.statusCode === 404) {
-                    callback('Invalid project.');
-                    return;
-                }
+        request(options, function(error, response, body) {
+            if (response.statusCode === 404) {
+                callback('Invalid project.');
+                return;
+            }
 
-                if (response.statusCode !== 200) {
-                    callback(response.statusCode + ': Unable to connect to JIRA during getVersions.');
-                    return;
-                }
+            if (response.statusCode !== 200) {
+                callback(response.statusCode + ': Unable to connect to JIRA during getVersions.');
+                return;
+            }
 
-                body = JSON.parse(body);
-                callback(null, body);
-            });
+            body = JSON.parse(body);
+            callback(null, body);
         });
     };
 
     this.createVersion = function(version, callback) {
         var self = this;
 
-        this.login(function() {
-            var options = {
-                uri: url.format({
-                    protocol:  self.protocol,
-                    host: self.host,
-                    port: self.port,
-                    pathname: 'rest/api/' + self.apiVersion + '/version'
-                }),
-                method: 'POST',
-                json: true,
-                body: version,
-                headers: {
-                    Cookie: self.cookies.join(';')
-                }
-            };
-            request(options, function(error, response, body) {
-                if (response.statusCode === 404) {
-                    callback('Version does not exist or the currently authenticated user does not have permission to view it');
-                    return;
-                }
+        var options = {
+            uri: url.format({
+                protocol: self.protocol,
+                host: self.host,
+                port: self.port,
+                pathname: 'rest/api/' + self.apiVersion + '/version'
+            }),
+            method: 'POST',
+            json: true,
+            body: version,
+            headers: {
+                Cookie: self.cookies.join(';')
+            }
+        };
+        request(options, function(error, response, body) {
+            if (response.statusCode === 404) {
+                callback('Version does not exist or the currently authenticated user does not have permission to view it');
+                return;
+            }
 
-                if (response.statusCode === 403) {
-                    callback('The currently authenticated user does not have permission to edit the version');
-                    return;
-                }
+            if (response.statusCode === 403) {
+                callback('The currently authenticated user does not have permission to edit the version');
+                return;
+            }
 
-                if (response.statusCode !== 201) {
-                    callback(response.statusCode + ': Unable to connect to JIRA during createVersion.');
-                    return;
-                }
+            if (response.statusCode !== 201) {
+                callback(response.statusCode + ': Unable to connect to JIRA during createVersion.');
+                return;
+            }
 
-                callback(null, body);
-            });
+            callback(null, body);
         });
     };
 

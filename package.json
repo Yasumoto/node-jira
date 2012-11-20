@@ -1,6 +1,6 @@
 {
     "name" : "jira",
-    "version" : "0.0.2",
+    "version" : "0.1.0",
     "description" : "Wrapper for the JIRA API",
     "author" : "Steven Surowiec <steven.surowiec@gmail.com>",
     "homepage" : "http://github.com/steves/node-jira",
